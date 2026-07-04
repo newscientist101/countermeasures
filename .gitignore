@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.playwright/
+test-results/
+playwright-report/
+blob-report/
+*.log
+test_all_results.txt
+test_results.txt
+test_results_killer.txt
+test_minify.js
