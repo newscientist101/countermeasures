@@ -1,6 +1,6 @@
-# ByteHide Shield Countermeasures
+# Devtools Blocking Countermeasures
 
-This project implements countermeasures for disarming the `ByteHide Shield` (DevTools blocking) protection.
+This project implements countermeasures for disarming DevTools blocking.
 
 ## Standards Used
 
