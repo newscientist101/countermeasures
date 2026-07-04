@@ -1,0 +1,15 @@
+{
+  "name": "bytehide-shield-countermeasures",
+  "version": "1.0.0",
+  "description": "Countermeasures for ByteHide Shield DevTools blocking",
+  "main": "index.js",
+  "scripts": {
+    "build": "node build.js",
+    "test": "npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "playwright": "^1.40.0",
+    "terser": "^5.26.0"
+  }
+}

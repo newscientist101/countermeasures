@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ByteHide Shield Mock Detection</title>
+</head>
+<body>
+    <h1>ByteHide Shield Mock</h1>
+    <div id="status">Shield Active</div>
+    <script data-protected="true">
+        (function() {
+            function check() {
+                const widthDiff = window.outerWidth - window.innerWidth;
+                const heightDiff = window.outerHeight - window.innerHeight;
+
+                if (widthDiff > 160 || heightDiff > 160) {
+                    fail("DevTools detected via viewport");
+                }
+            }
+
+            function fail(reason) {
+                document.getElementById('status').innerText = "DETECTED: " + reason;
+                const scripts = document.querySelectorAll('script');
+                scripts.forEach(s => s.remove());
+                throw new Error("Security violation");
+            }
+
+            setInterval(check, 1000);
+        })();
+    </script>
+</body>
+</html>
