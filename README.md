@@ -6,8 +6,6 @@ This project implements countermeasures for disarming the `ByteHide Shield` (Dev
 
 - **Red-Green-Refactor Cycle**: All countermeasures were developed using TDD with Playwright to verify their effectiveness against mock detection scenarios.
 - **Bookmarklet Format**: The final artifacts are provided as minified bookmarklets for easy injection into target environments.
-- **Hard Freeze Strategy**: As per requirements, a "hard freeze" was implemented for timing functions (`performance.now`, `Date.now`) and interval hijacking.
-- **Broad DOM Protection**: Prevents removal of any `<script>` tags to protect both the disarmer and other critical site scripts.
 
 ## Countermeasures
 
