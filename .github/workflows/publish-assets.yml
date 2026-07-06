@@ -36,25 +36,35 @@ jobs:
           echo "Head SHA: $SHA"
           echo "Head Branch: $BRANCH"
 
-          git fetch --tags --force --all
+          # Use ls-remote to check tags on the remote directly, bypass local fetch issues
+          echo "Checking remote tags for SHA $SHA..."
+          REMOTE_TAGS=$(git ls-remote --tags origin)
 
-          # 1. Try to see if the branch name is actually a tag pointing at the SHA
-          TAG_BY_BRANCH=$(git tag --points-at "$SHA" | grep -Fx "$BRANCH" || true)
+          # Find tag name. For annotated tags, ls-remote returns:
+          # <tag-sha> refs/tags/v1.0.0
+          # <commit-sha> refs/tags/v1.0.0^{}
+          # For lightweight tags, it just returns:
+          # <commit-sha> refs/tags/v1.0.0
 
-          # 2. Fallback to any tag pointing at the SHA
-          TAG_BY_SHA=$(git tag --points-at "$SHA" | head -n 1)
+          # This grep finds any tag name associated with the SHA
+          TAG=$(echo "$REMOTE_TAGS" | grep "$SHA" | grep "refs/tags/" | head -n 1 | sed 's|.*/tags/||; s|\^{}||')
 
-          if [ -n "$TAG_BY_BRANCH" ]; then
-            echo "Found tag matching branch name: $TAG_BY_BRANCH"
-            echo "tag=$TAG_BY_BRANCH" >> $GITHUB_OUTPUT
-            echo "is_tag=true" >> $GITHUB_OUTPUT
-          elif [ -n "$TAG_BY_SHA" ]; then
-            echo "Found tag by SHA: $TAG_BY_SHA"
-            echo "tag=$TAG_BY_SHA" >> $GITHUB_OUTPUT
+          if [ -n "$TAG" ]; then
+            echo "Found remote tag: $TAG"
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
             echo "is_tag=true" >> $GITHUB_OUTPUT
           else
-            echo "No tag found for SHA $SHA"
-            echo "is_tag=false" >> $GITHUB_OUTPUT
+            # Local fallback as a last resort
+            git fetch --tags --force --all
+            TAG_LOCAL=$(git tag --points-at "$SHA" | head -n 1)
+            if [ -n "$TAG_LOCAL" ]; then
+               echo "Found local tag: $TAG_LOCAL"
+               echo "tag=$TAG_LOCAL" >> $GITHUB_OUTPUT
+               echo "is_tag=true" >> $GITHUB_OUTPUT
+            else
+               echo "No tag found for SHA $SHA"
+               echo "is_tag=false" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Skip if not a tag
