@@ -1,0 +1,127 @@
+name: CI and Publish
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ '*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v6
+      with:
+        node-version: lts/*
+    - name: Install dependencies
+      run: npm ci
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium
+    - name: Build
+      run: npm run build
+    - name: Run Playwright tests
+      run: npx playwright test
+    - uses: actions/upload-artifact@v7
+      if: failure()
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: test
+    if: success() && startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: lts/*
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build bookmarklets
+      run: npm run build
+
+    - name: Bundle bookmarklets
+      shell: bash
+      run: |
+        DIST_DIR="dist"
+        SRC_DIR="src"
+        OUTPUT_FILE="bookmarklets.html"
+        NOW=$(date +%s)
+
+        html_escape() {
+            printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+        }
+
+        titleize() {
+            printf '%s' "$1" | sed -E 's/(^|[[:space:]:-])([a-z])/\1\U\2/g; s/[-_]/ /g'
+        }
+
+        cat <<HTML_HEAD > "$OUTPUT_FILE"
+        <!DOCTYPE NETSCAPE-Bookmark-file-1>
+        <!-- This is an automatically generated file. It will be read and overwritten. DO NOT EDIT! -->
+        <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+        <TITLE>Bookmarks</TITLE>
+        <H1>Bookmarks</H1>
+        <DL><p>
+            <DT><H3 ADD_DATE="$NOW" LAST_MODIFIED="$NOW" PERSONAL_TOOLBAR_FOLDER="true">DevTools Countermeasures</H3>
+            <DL><p>
+        HTML_HEAD
+
+        process_dir() {
+            local current_dir="$1"
+            local indent="$2"
+
+            find "$current_dir" -mindepth 1 -maxdepth 1 -type d -not -path "*/utils" | sort | while read -r dir; do
+                if [ -z "$dir" ]; then continue; fi
+                local dir_name=$(basename "$dir")
+                local title=$(titleize "$dir_name")
+                printf "%s    <DT><H3 ADD_DATE=\"%s\" LAST_MODIFIED=\"%s\">%s</H3>\n" "$indent" "$NOW" "$NOW" "$(html_escape "$title")" >> "$OUTPUT_FILE"
+                printf "%s    <DL><p>\n" "$indent" >> "$OUTPUT_FILE"
+                process_dir "$dir" "${indent}    "
+                printf "%s    </DL><p>\n" "$indent" >> "$OUTPUT_FILE"
+            done
+
+            find "$current_dir" -mindepth 1 -maxdepth 1 -type f -name "*.js" | sort | while read -r file; do
+                if [ -z "$file" ]; then continue; fi
+                local rel_path=$(python3 -c "import os; print(os.path.relpath('$file', '$SRC_DIR'))")
+                local output_name=$(echo "$rel_path" | sed 's/[/\\]/-/g; s/\.js$/.txt/')
+                local dist_file="$DIST_DIR/$output_name"
+
+                if [[ -f "$dist_file" ]]; then
+                    local title_raw=$(echo "$rel_path" | sed 's/\.js$//; s/[/\\]/ /g')
+                    local title=$(titleize "$title_raw")
+                    local href=$(cat "$dist_file")
+                    printf "%s    <DT><A HREF=\"%s\" ADD_DATE=\"%s\">%s</A>\n" "$indent" "$(html_escape "$href")" "$NOW" "$(html_escape "$title")" >> "$OUTPUT_FILE"
+                fi
+            done
+        }
+
+        process_dir "$SRC_DIR" "    "
+
+        cat <<HTML_FOOT >> "$OUTPUT_FILE"
+            </DL><p>
+        </DL><p>
+        HTML_FOOT
+
+    - name: Upload Assets to Release
+      uses: softprops/action-gh-release@v3
+      with:
+        files: bookmarklets.html
+        append_body: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

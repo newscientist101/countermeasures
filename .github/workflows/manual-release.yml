@@ -50,6 +50,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Explicitly trigger the CI Tests workflow for the new tag
+          # Explicitly trigger the CI and Publish workflow for the new tag
           # because GITHUB_TOKEN-pushed tags don't trigger workflows automatically.
-          gh workflow run "CI Tests" --ref ${{ github.event.inputs.tag_name }}
+          gh workflow run "CI and Publish" --ref ${{ github.event.inputs.tag_name }}
