@@ -1,0 +1,93 @@
+name: Release Bookmarklets
+
+on:
+  workflow_run:
+    workflows: ["CI Tests"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the manual release (optional)'
+        required: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Identify Tag
+        id: identify_tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+            if [ -z "$TAG_NAME" ]; then
+              TAG_NAME="manual-$(date +'%Y%m%d-%H%M%S')"
+            fi
+            echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+            echo "draft=true" >> $GITHUB_OUTPUT
+          else
+            # For workflow_run, check if the head_sha has an associated tag
+            SHA="${{ github.event.workflow_run.head_sha }}"
+            # Ensure tags are fetched
+            git fetch --tags
+            TAG=$(git tag --points-at "$SHA" | head -n 1)
+            if [ -n "$TAG" ]; then
+              echo "tag=$TAG" >> $GITHUB_OUTPUT
+              echo "is_tag=true" >> $GITHUB_OUTPUT
+              echo "draft=false" >> $GITHUB_OUTPUT
+            else
+              echo "is_tag=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Skip if not a tag
+        if: steps.identify_tag.outputs.is_tag != 'true'
+        run: |
+          echo "No tag found for this commit. Skipping release."
+          exit 0
+
+      - name: Setup Node.js
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        run: npm ci
+
+      - name: Build bookmarklets
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        run: npm run build
+
+      - name: Bundle bookmarklets
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        run: |
+          zip -j bookmarklets.zip dist/*.txt
+
+      - name: Create GitHub Release
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.identify_tag.outputs.tag }}
+          files: bookmarklets.zip
+          draft: ${{ steps.identify_tag.outputs.draft }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
