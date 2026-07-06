@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>devtools-detector Mock</title>
+    <style>
+        body { font-family: sans-serif; }
+        .status { padding: 10px; margin: 5px; border: 1px solid #ccc; }
+        .detected { background-color: #ffcccc; }
+        .not-detected { background-color: #ccffcc; }
+    </style>
+</head>
+<body>
+    <h1>devtools-detector Mock</h1>
+    <div id="FormatterCheck" class="status">FormatterCheck: <span>WAITING</span></div>
+    <div id="GeometryCheck" class="status">GeometryCheck: <span>WAITING</span></div>
+    <div id="IDCheck" class="status">IDCheck: <span>WAITING</span></div>
+    <div id="ToStringCheck" class="status">ToStringCheck: <span>WAITING</span></div>
+    <div id="DestructiveCheck" class="status">DestructiveCheck: <span>WAITING</span></div>
+
+    <script>
+        const status = {
+            formatter: false,
+            geometry: false,
+            id: false,
+            toString: false
+        };
+
+        function updateDisplay(id, detected) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.querySelector('span').innerText = detected ? 'DETECTED' : 'NOT DETECTED';
+            el.className = 'status ' + (detected ? 'detected' : 'not-detected');
+        }
+
+        // 1. devtoolsFormatters Trap
+        function setupFormatter() {
+            window.devtoolsFormatters = window.devtoolsFormatters || [];
+            window.devtoolsFormatters.push({
+                header: function(obj) {
+                    if (obj && obj.__trap) {
+                        status.formatter = true;
+                    }
+                    return null;
+                },
+                hasBody: () => false
+            });
+        }
+
+        // 2. Geometry Check
+        function checkGeometry() {
+            const isDocked = (window.outerWidth > window.innerWidth) || (window.outerHeight > window.innerHeight);
+            status.geometry = isDocked;
+        }
+
+        // 3. ID Trap
+        function checkIDTrap() {
+            const element = document.createElement('div');
+            try {
+                Object.defineProperty(element, 'id', {
+                    get: function() {
+                        status.id = true;
+                        return 'trap';
+                    },
+                    configurable: true
+                });
+                const _id = element.id;
+            } catch (e) {}
+        }
+
+        // 4. toString check
+        function isOpen() { return "I am the detector"; }
+        function checkToString() {
+            if (isOpen.toString().includes('[native code]')) {
+                status.toString = true;
+            }
+        }
+
+        // 5. Destructive actions
+        function triggerReload() {
+            console.log('Mock: Triggering reload');
+            try {
+                location.reload();
+            } catch (e) {
+                console.log('Mock: reload() failed or was blocked', e);
+            }
+            updateDisplay('DestructiveCheck', true);
+            document.getElementById('DestructiveCheck').querySelector('span').innerText = 'RELOAD TRIGGERED';
+        }
+
+        function triggerClose() {
+            console.log('Mock: Triggering close');
+            try {
+                window.close();
+            } catch (e) {
+                console.log('Mock: close() failed or was blocked', e);
+            }
+            updateDisplay('DestructiveCheck', true);
+            document.getElementById('DestructiveCheck').querySelector('span').innerText = 'CLOSE TRIGGERED';
+        }
+
+        window.runChecks = function() {
+            console.log('Mock: Running checks');
+
+            status.formatter = false;
+            status.geometry = false;
+            status.id = false;
+            status.toString = false;
+
+            checkGeometry();
+            checkIDTrap();
+            checkToString();
+
+            if (window.devtoolsFormatters) {
+                try {
+                    window.devtoolsFormatters.forEach(f => {
+                        if (typeof f.header === 'function') f.header({__trap: true});
+                    });
+                } catch (e) {}
+            }
+
+            updateDisplay('FormatterCheck', status.formatter);
+            updateDisplay('GeometryCheck', status.geometry);
+            updateDisplay('IDCheck', status.id);
+            updateDisplay('ToStringCheck', status.toString);
+            console.log('Mock: Checks complete', status);
+        };
+
+        setupFormatter();
+    </script>
+</body>
+</html>

@@ -8,9 +8,10 @@ test.describe('detect-devtools Detection', () => {
         await page.goto(`file://${path.join(process.cwd(), 'tests/fixtures/detect-devtools-mock.html')}`);
 
         // Inject the disarmer before the mock's checks run
-        // The mock waits 500ms before starting, so we have time if we inject now.
-        // But better to inject as early as possible.
-        const disarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/detect-devtools/disarmer.js'), 'utf8');
+        const stealthSource = fs.readFileSync(path.join(process.cwd(), 'src/utils/stealth.js'), 'utf8');
+        let disarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/detect-devtools/disarmer.js'), 'utf8');
+        disarmerSource = disarmerSource.replace(/\/\/ @include\s+["'](.+?)["']/, stealthSource);
+
         await page.evaluate(disarmerSource);
 
         // Manually trigger checks because the disarmer might have killed the scheduled timeout
