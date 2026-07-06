@@ -11,8 +11,8 @@
     try {
         window.devtoolsFormatters = [];
         Object.defineProperty(window, 'devtoolsFormatters', {
-            get: () => [],
-            set: () => {},
+            get: window.__stealth_protect(() => [], 'get'),
+            set: window.__stealth_protect(() => {}, 'set'),
             configurable: false
         });
     } catch (e) {}
@@ -33,18 +33,15 @@
         const _innerWidth = window.innerWidth;
         const _innerHeight = window.innerHeight;
         Object.defineProperty(window, 'outerWidth', {
-            get: () => _innerWidth,
-            set: () => {},
+            get: window.__stealth_protect(() => window.innerWidth, 'outerWidth'),
             configurable: false
         });
         Object.defineProperty(window, 'outerHeight', {
-            get: () => _innerHeight,
-            set: () => {},
+            get: window.__stealth_protect(() => window.innerHeight, 'outerHeight'),
             configurable: false
         });
         Object.defineProperty(window, 'devicePixelRatio', {
-            get: () => 1,
-            set: () => {},
+            get: window.__stealth_protect(() => 1, 'devicePixelRatio'),
             configurable: false
         });
     } catch (e) {}
@@ -52,6 +49,8 @@
     // 5. Neutralize destructive actions
     try {
         window.close = window.__stealth_protect(noop, 'close');
+
+        // Location reload neutralization
         const _location = window.location;
         try {
             Object.defineProperty(_location, 'reload', {
@@ -76,6 +75,18 @@
                     window.devtoolsDetector._listeners = [];
                 }
             } catch (e) {}
+                const proxy = new Proxy(_location, {
+                    get: (target, prop) => {
+                        if (prop === 'reload') return noop;
+                        const val = target[prop];
+                        return typeof val === 'function' ? val.bind(target) : val;
+                    }
+                });
+                Object.defineProperty(window, 'location', {
+                    get: window.__stealth_protect(() => proxy, 'location'),
+                    configurable: true
+                });
+            } catch (e2) {}
         }
     };
     targetLibrary();

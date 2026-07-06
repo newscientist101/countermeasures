@@ -24,6 +24,19 @@ test.describe('disable-devtool Disarmer', () => {
         await page.addInitScript(getDisarmerSource());
         await page.goto(`file://${path.join(process.cwd(), 'tests/fixtures/disable-devtool.html')}`);
 
+        // Inject the disarmer
+        const stealthSource = fs.readFileSync(path.join(process.cwd(), 'src/utils/stealth.js'), 'utf8');
+        let disarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/disable-devtool/disarmer.js'), 'utf8');
+        disarmerSource = disarmerSource.replace(/\/\/ @include\s+["'](.+?)["']/, stealthSource);
+        await page.evaluate(disarmerSource);
+
+        let detected = false;
+        page.on('console', msg => {
+            if (msg.text().includes('Devtools detected!') || msg.text().includes('permission to use DEVTOOL')) {
+                detected = true;
+            }
+        });
+
         await page.evaluate(() => {
             try {
                 Object.defineProperty(window, 'outerWidth', { get: () => 2000, configurable: true });
