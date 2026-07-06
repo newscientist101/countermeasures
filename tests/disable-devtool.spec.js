@@ -31,7 +31,9 @@ test.describe('disable-devtool Disarmer', () => {
         await page.goto(`file://${path.join(process.cwd(), 'tests/fixtures/disable-devtool.html')}`);
 
         // Inject the disarmer
-        const disarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/disable-devtool/disarmer.js'), 'utf8');
+        const stealthSource = fs.readFileSync(path.join(process.cwd(), 'src/utils/stealth.js'), 'utf8');
+        let disarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/disable-devtool/disarmer.js'), 'utf8');
+        disarmerSource = disarmerSource.replace(/\/\/ @include\s+["'](.+?)["']/, stealthSource);
         await page.evaluate(disarmerSource);
 
         let detected = false;

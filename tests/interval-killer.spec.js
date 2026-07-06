@@ -16,7 +16,9 @@ test.describe('Interval Killer Bookmarklet', () => {
         const firedBefore = await page.evaluate(() => window.intervalFired);
         expect(firedBefore).toBeGreaterThan(0);
 
-        const killerSource = fs.readFileSync(path.join(process.cwd(), 'src/bytehide-shield/interval-killer.js'), 'utf8');
+        const stealthSource = fs.readFileSync(path.join(process.cwd(), 'src/utils/stealth.js'), 'utf8');
+        let killerSource = fs.readFileSync(path.join(process.cwd(), 'src/bytehide-shield/interval-killer.js'), 'utf8');
+        killerSource = killerSource.replace(/\/\/ @include\s+["'](.+?)["']/, stealthSource);
         await page.evaluate(killerSource);
 
         const firedAfterKiller = await page.evaluate(() => window.intervalFired);

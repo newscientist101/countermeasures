@@ -6,7 +6,9 @@ test.describe('Core Disarmer Bookmarklet', () => {
     test('should disarm viewport detection', async ({ page }) => {
         await page.goto(`file://${path.join(process.cwd(), 'tests/fixtures/mock-shield.html')}`);
 
-        const coreDisarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/bytehide-shield/core-disarmer.js'), 'utf8');
+        const stealthSource = fs.readFileSync(path.join(process.cwd(), 'src/utils/stealth.js'), 'utf8');
+        let coreDisarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/bytehide-shield/core-disarmer.js'), 'utf8');
+        coreDisarmerSource = coreDisarmerSource.replace(/\/\/ @include\s+["'](.+?)["']/, stealthSource);
         await page.evaluate(coreDisarmerSource);
 
         const outerWidth = await page.evaluate(() => window.outerWidth);
@@ -20,7 +22,9 @@ test.describe('Core Disarmer Bookmarklet', () => {
     test('should prevent script removal', async ({ page }) => {
         await page.goto(`file://${path.join(process.cwd(), 'tests/fixtures/mock-shield.html')}`);
 
-        const coreDisarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/bytehide-shield/core-disarmer.js'), 'utf8');
+        const stealthSource = fs.readFileSync(path.join(process.cwd(), 'src/utils/stealth.js'), 'utf8');
+        let coreDisarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/bytehide-shield/core-disarmer.js'), 'utf8');
+        coreDisarmerSource = coreDisarmerSource.replace(/\/\/ @include\s+["'](.+?)["']/, stealthSource);
         await page.evaluate(coreDisarmerSource);
 
         const scriptCountBefore = await page.locator('script').count();

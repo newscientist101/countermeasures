@@ -7,8 +7,8 @@
     try {
         window.devtoolsFormatters = [];
         Object.defineProperty(window, 'devtoolsFormatters', {
-            get: () => [],
-            set: () => {},
+            get: window.__stealth_protect(() => [], 'get'),
+            set: window.__stealth_protect(() => {}, 'set'),
             configurable: false
         });
     } catch (e) {}
@@ -25,15 +25,15 @@
     // 3. Fake geometry
     try {
         Object.defineProperty(window, 'outerWidth', {
-            get: () => window.innerWidth,
+            get: window.__stealth_protect(() => window.innerWidth, 'outerWidth'),
             configurable: false
         });
         Object.defineProperty(window, 'outerHeight', {
-            get: () => window.innerHeight,
+            get: window.__stealth_protect(() => window.innerHeight, 'outerHeight'),
             configurable: false
         });
         Object.defineProperty(window, 'devicePixelRatio', {
-            get: () => 1,
+            get: window.__stealth_protect(() => 1, 'devicePixelRatio'),
             configurable: false
         });
     } catch (e) {}
@@ -43,8 +43,6 @@
         window.close = window.__stealth_protect(noop, 'close');
 
         // Location reload neutralization
-        // We try to replace the property on the instance.
-        // If it fails, we try to redefine it on the window object.
         const _location = window.location;
         try {
             Object.defineProperty(_location, 'reload', {
@@ -54,7 +52,6 @@
             });
         } catch (e) {
             try {
-                // If we can't change .reload, maybe we can change window.location
                 const proxy = new Proxy(_location, {
                     get: (target, prop) => {
                         if (prop === 'reload') return noop;
@@ -63,7 +60,7 @@
                     }
                 });
                 Object.defineProperty(window, 'location', {
-                    get: () => proxy,
+                    get: window.__stealth_protect(() => proxy, 'location'),
                     configurable: true
                 });
             } catch (e2) {}

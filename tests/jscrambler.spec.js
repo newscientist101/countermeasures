@@ -28,8 +28,12 @@ test.describe('Jscrambler Universal Bypass', () => {
 
     test('Green Phase: Disarmer and Timing Suppressor should neutralize detections', async ({ page }) => {
         // 1. Load and inject the disarmer and suppressor
-        const disarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/jscrambler/disarmer.js'), 'utf8');
-        const suppressorSource = fs.readFileSync(path.join(process.cwd(), 'src/jscrambler/timing-suppressor.js'), 'utf8');
+        const stealthSource = fs.readFileSync(path.join(process.cwd(), 'src/utils/stealth.js'), 'utf8');
+        let disarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/jscrambler/disarmer.js'), 'utf8');
+        disarmerSource = disarmerSource.replace(/\/\/ @include\s+["'](.+?)["']/, stealthSource);
+
+        let suppressorSource = fs.readFileSync(path.join(process.cwd(), 'src/jscrambler/timing-suppressor.js'), 'utf8');
+        suppressorSource = suppressorSource.replace(/\/\/ @include\s+["'](.+?)["']/, stealthSource);
 
         await page.evaluate(disarmerSource);
         await page.evaluate(suppressorSource);
