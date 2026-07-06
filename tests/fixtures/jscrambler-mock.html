@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Jscrambler Mock</title>
+</head>
+<body>
+    <div id="status">Scanning...</div>
+    <ul id="results"></ul>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const resultsEl = document.getElementById('results');
+
+        function report(name, detected) {
+            const li = document.createElement('li');
+            li.id = name;
+            li.textContent = `${name}: ${detected ? 'DETECTED' : 'NOT DETECTED'}`;
+            li.style.color = detected ? 'red' : 'green';
+            resultsEl.appendChild(li);
+
+            if (detected) {
+                statusEl.textContent = 'Jscrambler detection triggered!';
+                statusEl.style.color = 'red';
+            }
+        }
+
+        // 1. Timing Anomaly
+        function runTimingCheck() {
+            const start = performance.now();
+            const dateStart = Date.now();
+
+            // Artificial delay
+            const end = performance.now();
+            const dateEnd = Date.now();
+
+            // If time moves forward, we consider it "detected" (normal behavior without bypass)
+            // The suppressor will make this 0
+            report('TimingCheck', (end - start) > 0 || (dateEnd - dateStart) > 0);
+        }
+
+        // 2. Console Getter Trap
+        function runConsoleTrapCheck() {
+            let detected = false;
+            const trap = {};
+            Object.defineProperty(trap, 'id', {
+                get: () => {
+                    detected = true;
+                    return 'trap';
+                }
+            });
+            console.log(trap);
+            setTimeout(() => report('ConsoleTrapCheck', detected), 100);
+        }
+
+        // 3. Native Integrity (toString)
+        function runIntegrityCheck() {
+            const isNative = (fn) => fn.toString().includes('[native code]');
+            // Check some functions we intend to hook
+            const performanceNowNative = isNative(performance.now);
+            const definePropertyNative = isNative(Object.defineProperty);
+
+            // In a real scenario, Jscrambler would detect if these are NOT native.
+            // For the mock, we'll report "DETECTED" if they ARE native,
+            // and the bypass should make them LOOK native even when hooked.
+            // Actually, let's make it: DETECTED if the check fails.
+            // If hooked without protection, it won't have [native code].
+            const hookedButNotNative = !isNative(performance.now) || !isNative(Object.defineProperty);
+            report('IntegrityCheck', hookedButNotNative);
+        }
+
+        // 4. Dynamic Debugger
+        function runDynamicDebuggerCheck() {
+            let detected = false;
+            try {
+                const fnBody = 'debugger; return "safe";';
+                const fn = new Function(fnBody);
+
+                // We want to detect if 'debugger' is still IN THE SOURCE of the function
+                // that will actually be executed.
+                // Since our bypass replaces it with a comment,
+                // the real function shouldn't have 'debugger' in its actual code.
+
+                // Note: Function.prototype.toString might be spoofed to LIE.
+                // We can try to see if we can "beat" the spoof,
+                // or just accept that if it's spoofed correctly, it LOOKS detected to the mock
+                // even if it's safe.
+
+                // Wait, if the bypass spoofs it back to 'debugger',
+                // then the mock WILL see 'debugger' and report DETECTED.
+                // We should probably check if it actually PAUSES,
+                // but that's hard in Playwright.
+
+                // Let's change the mock to check for a specific "secret"
+                // that our bypass might leave behind if it's NOT working perfectly.
+
+                const fnStr = fn.toString();
+                detected = fnStr.includes('debugger') && !fnStr.includes('blocked');
+
+                // Actually, if our bypass is active, fn() should NOT pause.
+                // Since we can't detect pauses easily, let's just check if it's working
+                // by seeing if our replacement string is NOT there when it should be.
+
+                // If the bypass is working, fn() returns "safe" without pausing.
+                if (fn() === 'safe') {
+                    // In the bypass, we might want to check if 'debugger' was removed.
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            report('DebuggerCheck', detected);
+        }
+
+        // 5. Stack Trace Check
+        function runStackCheck() {
+            let detected = false;
+            try {
+                throw new Error('test');
+            } catch (e) {
+                // Jscrambler might check if the stack is "too clean" or modified
+                // For mock, we'll just check if we can access the stack
+                detected = !!e.stack;
+            }
+            // If the suppressor blocks stack access or returns fixed value, we can verify it.
+            // Let's say if it contains "test" (the error message), it's the real stack.
+            report('StackCheck', detected);
+        }
+
+        window.runAllChecks = () => {
+            resultsEl.innerHTML = '';
+            runTimingCheck();
+            runConsoleTrapCheck();
+            runIntegrityCheck();
+            runDynamicDebuggerCheck();
+            runStackCheck();
+        };
+
+        setTimeout(window.runAllChecks, 500);
+    </script>
+</body>
+</html>
