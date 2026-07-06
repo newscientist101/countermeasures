@@ -1,7 +1,7 @@
 {
-  "name": "bytehide-shield-countermeasures",
+  "name": "devtools-blocking-countermeasures",
   "version": "1.0.0",
-  "description": "Countermeasures for ByteHide Shield DevTools blocking",
+  "description": "Countermeasures for DevTools blocking",
   "main": "index.js",
   "scripts": {
     "build": "node build.js",
