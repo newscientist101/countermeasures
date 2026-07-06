@@ -32,12 +32,28 @@ jobs:
         shell: bash
         run: |
           SHA="${{ github.event.workflow_run.head_sha }}"
-          git fetch --tags
-          TAG=$(git tag --points-at "$SHA" | head -n 1)
-          if [ -n "$TAG" ]; then
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          echo "Head SHA: $SHA"
+          echo "Head Branch: $BRANCH"
+
+          git fetch --tags --force --all
+
+          # 1. Try to see if the branch name is actually a tag pointing at the SHA
+          TAG_BY_BRANCH=$(git tag --points-at "$SHA" | grep -Fx "$BRANCH" || true)
+
+          # 2. Fallback to any tag pointing at the SHA
+          TAG_BY_SHA=$(git tag --points-at "$SHA" | head -n 1)
+
+          if [ -n "$TAG_BY_BRANCH" ]; then
+            echo "Found tag matching branch name: $TAG_BY_BRANCH"
+            echo "tag=$TAG_BY_BRANCH" >> $GITHUB_OUTPUT
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+          elif [ -n "$TAG_BY_SHA" ]; then
+            echo "Found tag by SHA: $TAG_BY_SHA"
+            echo "tag=$TAG_BY_SHA" >> $GITHUB_OUTPUT
             echo "is_tag=true" >> $GITHUB_OUTPUT
           else
+            echo "No tag found for SHA $SHA"
             echo "is_tag=false" >> $GITHUB_OUTPUT
           fi
 
@@ -122,7 +138,7 @@ jobs:
 
       - name: Upload Assets to Release
         if: steps.identify_tag.outputs.is_tag == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.identify_tag.outputs.tag }}
           files: bookmarklets.html
