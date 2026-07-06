@@ -39,41 +39,21 @@
         }
     }, 'defineProperties');
 
-    // 2. Normalize viewport properties
-    const normalizeViewport = (prop) => {
-        try {
-            originalDefineProperty(window, prop, {
-                get: window.__stealth_protect(function() {
-                    if (prop === 'outerWidth') return window.innerWidth;
-                    if (prop === 'outerHeight') return window.innerHeight;
-                    return window[prop];
-                }, 'get'),
-                configurable: true,
-                enumerable: true
-            });
-        } catch (e) {}
-    };
-
-    normalizeViewport('outerWidth');
-    normalizeViewport('outerHeight');
-
-    // 3. Neutralize timing attacks
-    const constantTime = 0;
-    Date.now = window.__stealth_protect(() => constantTime, 'now');
-    if (typeof performance !== 'undefined' && performance.now) {
-        performance.now = window.__stealth_protect(() => constantTime, 'now');
-    }
+    // 3. Normalize viewport properties (Lock them)
+    try {
+        const _innerWidth = window.innerWidth;
+        const _innerHeight = window.innerHeight;
+        originalDefineProperty(window, 'outerWidth', { get: () => _innerWidth, configurable: false });
+        originalDefineProperty(window, 'outerHeight', { get: () => _innerHeight, configurable: false });
+    } catch (e) {}
 
     // 4. Disable active global instances if present
-    if (window.DisableDevtool) {
-        try {
-            window.DisableDevtool.isSuspend = true;
-            if (typeof window.DisableDevtool.off === 'function') {
-                window.DisableDevtool.off();
-            }
-            for (const key in window.DisableDevtool) {
-                if (typeof window.DisableDevtool[key] === 'function') {
-                    window.DisableDevtool[key] = window.__stealth_protect(function() {}, key);
+    const targetLibrary = () => {
+        if (window.DisableDevtool) {
+            try {
+                window.DisableDevtool.isSuspend = true;
+                if (typeof window.DisableDevtool.off === 'function') {
+                    window.DisableDevtool.off();
                 }
                 for (const key in window.DisableDevtool) {
                     if (typeof window.DisableDevtool[key] === 'function') {
@@ -93,7 +73,7 @@
         clearInterval(maxId);
     }
 
-    // 6. Stealth existing functions
+    // 6. Stealth
     if (window.__stealth_scan_and_hide) {
         window.__stealth_scan_and_hide();
     }

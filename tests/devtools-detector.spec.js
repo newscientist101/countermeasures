@@ -32,7 +32,6 @@ test.describe('devtools-detector Disarmer', () => {
             window.dispatchEvent(new Event('resize'));
         });
 
-        // Use toPass to verify it remains NOT DETECTED over a period
         await expect(async () => {
              const status = await page.locator('#status').innerText();
              expect(status).toBe('NOT DETECTED');

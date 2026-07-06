@@ -1,12 +1,10 @@
 (function() {
-    // @include "../utils/stealth.js"
-
     // 1. Mask Geometry
     const _defProp = Object.defineProperty;
     try {
-        _defProp(window, 'outerWidth', { get: window.__stealth_protect(() => window.innerWidth, 'outerWidth'), configurable: true });
-        _defProp(window, 'outerHeight', { get: window.__stealth_protect(() => window.innerHeight, 'outerHeight'), configurable: true });
-        _defProp(window, 'devicePixelRatio', { get: window.__stealth_protect(() => 1, 'devicePixelRatio'), configurable: true });
+        _defProp(window, 'outerWidth', { get: () => window.innerWidth, configurable: false });
+        _defProp(window, 'outerHeight', { get: () => window.innerHeight, configurable: false });
+        _defProp(window, 'devicePixelRatio', { get: () => 1, configurable: true });
     } catch (e) {
         console.warn('ByteHide Shield: Could not patch geometry', e);
     }
@@ -16,13 +14,12 @@
     const silencedMethods = ['log', 'clear', 'dir', 'table', 'warn', 'error', 'info', 'debug', 'trace'];
     silencedMethods.forEach(method => {
         try {
-            console[method] = window.__stealth_protect(noop, method);
+            console[method] = noop;
         } catch (e) {}
     });
 
     try {
-        performance.now = window.__stealth_protect(() => 0, 'now');
-        Date.now = window.__stealth_protect(() => 0, 'now');
+        performance.now = Date.now = () => 0;
     } catch (e) {
         console.warn('ByteHide Shield: Could not patch timing', e);
     }
@@ -53,22 +50,18 @@
     };
 
     const _remove = Element.prototype.remove;
-    Element.prototype.remove = window.__stealth_protect(function() {
+    Element.prototype.remove = function() {
         if (protectScript(this)) {
             return;
         }
         return _remove.apply(this, arguments);
-    }, 'remove');
+    };
 
     const _removeChild = Node.prototype.removeChild;
-    Node.prototype.removeChild = window.__stealth_protect(function(child) {
+    Node.prototype.removeChild = function(child) {
         if (protectScript(child)) {
             return child;
         }
         return _removeChild.apply(this, arguments);
-    }, 'removeChild');
-
-    if (window.__stealth_scan_and_hide) {
-        window.__stealth_scan_and_hide();
-    }
+    };
 })();
