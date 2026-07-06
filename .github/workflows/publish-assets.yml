@@ -1,0 +1,72 @@
+name: Publish Assets
+
+on:
+  workflow_run:
+    workflows: ["CI Tests"]
+    types:
+      - completed
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: Identify Tag
+        id: identify_tag
+        shell: bash
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          git fetch --tags
+          TAG=$(git tag --points-at "$SHA" | head -n 1)
+          if [ -n "$TAG" ]; then
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_tag=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip if not a tag
+        if: steps.identify_tag.outputs.is_tag != 'true'
+        run: |
+          echo "No tag found for this commit. Skipping asset publication."
+          exit 0
+
+
+      - name: Install dependencies
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        run: npm ci
+
+      - name: Build bookmarklets
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        run: npm run build
+
+      - name: Bundle bookmarklets
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        run: |
+          zip -j bookmarklets.zip dist/*.txt
+
+      - name: Upload Assets to Release
+        if: steps.identify_tag.outputs.is_tag == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.identify_tag.outputs.tag }}
+          files: bookmarklets.zip
+          append_body: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

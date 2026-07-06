@@ -1,0 +1,55 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (e.g., v1.0.0)'
+        required: true
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check latest CI status on main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CONCLUSION=$(gh run list --workflow "CI Tests" --branch main --limit 1 --status completed --json conclusion --jq '.[0].conclusion')
+          echo "Latest completed CI conclusion on main: $CONCLUSION"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "Error: The most recent completed CI run on main branch was not successful (Conclusion: $CONCLUSION)."
+            exit 1
+          fi
+
+      - name: Create Tag
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag ${{ github.event.inputs.tag_name }}
+          git push origin ${{ github.event.inputs.tag_name }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger Test Workflow for Tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Explicitly trigger the CI Tests workflow for the new tag
+          # because GITHUB_TOKEN-pushed tags don't trigger workflows automatically.
+          gh workflow run "CI Tests" --ref ${{ github.event.inputs.tag_name }}
