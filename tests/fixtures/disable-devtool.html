@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Disable-Devtool Test Fixture</title>
+</head>
+<body>
+    <div id="status">INITIAL</div>
+    <div id="detection-count">0</div>
+    <script src="https://cdn.jsdelivr.net/npm/disable-devtool"></script>
+    <script>
+        let count = 0;
+        if (typeof DisableDevtool !== 'undefined') {
+            DisableDevtool({
+                ondevtool: (val) => {
+                    count++;
+                    document.getElementById('status').innerText = 'DETECTED';
+                    document.getElementById('detection-count').innerText = count;
+                    console.log('Devtools detected!', val);
+                },
+                interval: 500
+            });
+        } else {
+            document.getElementById('status').innerText = 'LIBRARY NOT LOADED';
+        }
+    </script>
+</body>
+</html>
