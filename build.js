@@ -15,10 +15,11 @@ function getAllFiles(dirPath, arrayOfFiles) {
     arrayOfFiles = arrayOfFiles || [];
 
     files.forEach(function(file) {
-        if (fs.statSync(dirPath + "/" + file).isDirectory()) {
-            arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
+        const fullPath = path.join(dirPath, file);
+        if (fs.statSync(fullPath).isDirectory()) {
+            arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
         } else if (file.endsWith('.js')) {
-            arrayOfFiles.push(path.join(dirPath, "/", file));
+            arrayOfFiles.push(fullPath);
         }
     });
 
@@ -27,12 +28,31 @@ function getAllFiles(dirPath, arrayOfFiles) {
 
 async function buildBookmarklet(filePath) {
     const relativePath = path.relative(srcDir, filePath);
+
+    // Skip utils directory for direct bookmarklet generation
+    if (relativePath.split(path.sep).includes('utils')) {
+        return;
+    }
+
     // Use path segments for output name to avoid collisions and maintain structure
-    const outputName = relativePath.replace(/\//g, '-').replace(/\.js$/, '.txt').replace(/\\/g, '-');
+    const outputName = relativePath.replace(/[/\\]/g, '-').replace(/\.js$/, '.txt');
 
     console.log(`Building ${relativePath} -> ${outputName}`);
 
-    const code = fs.readFileSync(filePath, 'utf8');
+    let code = fs.readFileSync(filePath, 'utf8');
+
+    // Handle @include
+    const includeRegex = /\/\/ @include\s+["'](.+?)["']/g;
+    code = code.replace(includeRegex, (match, includePath) => {
+        const fullIncludePath = path.resolve(path.dirname(filePath), includePath);
+        if (fs.existsSync(fullIncludePath)) {
+            console.log(`  Including ${includePath}`);
+            return fs.readFileSync(fullIncludePath, 'utf8');
+        } else {
+            console.warn(`  Warning: Include file not found: ${fullIncludePath}`);
+            return match;
+        }
+    });
 
     const minified = await minify(code, {
         compress: {
