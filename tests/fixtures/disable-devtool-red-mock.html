@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Disable-Devtool Red Phase Mock</title>
+</head>
+<body>
+    <div id="status">INITIAL</div>
+    <script>
+        // A mock that behaves exactly like we expect the library to behave
+        // in terms of the signals the test looks for.
+        // This ensures the RED phase verifies the fixture's wiring.
+        (function() {
+            function check() {
+                const diff = window.outerWidth - window.innerWidth;
+                if (diff > 160) {
+                    document.getElementById('status').innerText = 'DETECTED';
+                    document.body.classList.add('detected');
+                }
+            }
+            setInterval(check, 500);
+        })();
+    </script>
+</body>
+</html>

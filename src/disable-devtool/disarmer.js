@@ -1,13 +1,16 @@
 (function() {
-    /**
-     * Countermeasure for disable-devtool library.
-     */
     // @include "../utils/stealth.js"
+
+    const noop = () => {};
+
+    // 1. Core Protections
+    if (window.__stealth_silence_console) window.__stealth_silence_console();
+    if (window.__stealth_suppress_timing) window.__stealth_suppress_timing();
 
     const originalDefineProperty = Object.defineProperty;
     const originalDefineProperties = Object.defineProperties;
 
-    // 1. Block property traps used to detect DevTools console inspection
+    // 2. Block property traps used to detect DevTools console inspection
     const blockedProps = ['id', 'className', 'nodeName', 'outerWidth', 'outerHeight', 'innerWidth', 'innerHeight'];
 
     Object.defineProperty = window.__stealth_protect(function(obj, prop, descriptor) {
@@ -36,54 +39,41 @@
         }
     }, 'defineProperties');
 
-    // 2. Normalize viewport properties
-    const normalizeViewport = (prop) => {
-        try {
-            originalDefineProperty(window, prop, {
-                get: window.__stealth_protect(function() {
-                    if (prop === 'outerWidth') return window.innerWidth;
-                    if (prop === 'outerHeight') return window.innerHeight;
-                    return window[prop];
-                }, 'get'),
-                configurable: true,
-                enumerable: true
-            });
-        } catch (e) {}
-    };
-
-    normalizeViewport('outerWidth');
-    normalizeViewport('outerHeight');
-
-    // 3. Neutralize timing attacks
-    const constantTime = 0;
-    Date.now = window.__stealth_protect(() => constantTime, 'now');
-    if (typeof performance !== 'undefined' && performance.now) {
-        performance.now = window.__stealth_protect(() => constantTime, 'now');
-    }
+    // 3. Normalize viewport properties (Lock them)
+    try {
+        const _innerWidth = window.innerWidth;
+        const _innerHeight = window.innerHeight;
+        originalDefineProperty(window, 'outerWidth', { get: () => _innerWidth, configurable: false });
+        originalDefineProperty(window, 'outerHeight', { get: () => _innerHeight, configurable: false });
+    } catch (e) {}
 
     // 4. Disable active global instances if present
-    if (window.DisableDevtool) {
-        try {
-            window.DisableDevtool.isSuspend = true;
-            if (typeof window.DisableDevtool.off === 'function') {
-                window.DisableDevtool.off();
-            }
-            for (const key in window.DisableDevtool) {
-                if (typeof window.DisableDevtool[key] === 'function') {
-                    window.DisableDevtool[key] = window.__stealth_protect(function() {}, key);
+    const targetLibrary = () => {
+        if (window.DisableDevtool) {
+            try {
+                window.DisableDevtool.isSuspend = true;
+                if (typeof window.DisableDevtool.off === 'function') {
+                    window.DisableDevtool.off();
                 }
-            }
-        } catch (e) {}
-    }
+                for (const key in window.DisableDevtool) {
+                    if (typeof window.DisableDevtool[key] === 'function') {
+                        window.DisableDevtool[key] = noop;
+                    }
+                }
+            } catch (e) {}
+        }
+    };
+    targetLibrary();
+    setInterval(targetLibrary, 500);
 
-    // 5. Kill intervals
+    // 5. Kill intervals (Aggressive)
     let maxId = setTimeout(() => {}, 0);
     while (maxId--) {
         clearTimeout(maxId);
         clearInterval(maxId);
     }
 
-    // 6. Stealth existing functions
+    // 6. Stealth
     if (window.__stealth_scan_and_hide) {
         window.__stealth_scan_and_hide();
     }

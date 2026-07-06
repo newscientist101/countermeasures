@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Jscrambler Complex Mock</title>
+</head>
+<body>
+    <h1>Jscrambler Complex Security Scan</h1>
+    <div id="status">Scanning...</div>
+    <ul id="results"></ul>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const resultsEl = document.getElementById('results');
+        const detections = new Set();
+
+        function report(name, detected) {
+            let li = document.getElementById('res-' + name);
+            if (!li) {
+                li = document.createElement('li');
+                li.id = 'res-' + name;
+                resultsEl.appendChild(li);
+            }
+            li.textContent = `${name}: ${detected ? 'DETECTED' : 'NOT DETECTED'}`;
+            li.style.color = detected ? 'red' : 'green';
+
+            if (detected) {
+                detections.add(name);
+                statusEl.textContent = 'Jscrambler detection triggered: ' + Array.from(detections).join(', ');
+                statusEl.style.color = 'red';
+            }
+        }
+
+        // 1. Timing Anomaly (Enhanced)
+        function checkTiming() {
+            const t0 = performance.now();
+            const d0 = Date.now();
+
+            // Some "work"
+            for(let i=0; i<1000; i++) { Math.sqrt(i); }
+
+            const t1 = performance.now();
+            const d1 = Date.now();
+
+            // When suppressed, delta will be 0.
+            // Normally, it should be > 0.
+            report('TimingCheck', (t1 - t0) > 0 || (d1 - d0) > 0);
+        }
+
+        // 2. RegExp.prototype.toString Trap
+        // Some libraries check if their code is beautified by stringifying a regex
+        function checkRegExpTrap() {
+            let detected = false;
+            const re = /abc/;
+            const originalToString = RegExp.prototype.toString;
+            // If someone hooks RegExp.prototype.toString, we might detect it
+            if (!RegExp.prototype.toString.toString().includes('[native code]')) {
+                detected = true;
+            }
+
+            // Jscrambler also checks for beautification
+            const reStr = re.toString();
+            if (reStr !== '/abc/') {
+                detected = true;
+            }
+            report('RegExpTrap', detected);
+        }
+
+        // 3. Integrity Check (arguments.callee.toString)
+        function checkIntegrity() {
+            let detected = false;
+            (function integrity() {
+                const str = arguments.callee.toString();
+                // If the function was hooked/modified, its string representation might change
+                if (!str.includes('arguments.callee.toString()')) {
+                    detected = true;
+                }
+                // Check if toString itself is native
+                if (!arguments.callee.toString.toString().includes('[native code]')) {
+                    detected = true;
+                }
+            })();
+            report('IntegrityCheck', detected);
+        }
+
+        // 4. Stack Trace Inspection
+        function checkStack() {
+            let detected = false;
+            try {
+                throw new Error('stack-check');
+            } catch (e) {
+                const stack = e.stack || '';
+                // If the stack is suppressed or null, we'll say it's NOT DETECTED (bypass working)
+                // If it exists, it's "DETECTED" (as in, environment is not protected)
+                detected = !!stack;
+            }
+            report('StackCheck', detected);
+        }
+
+        // 5. SourceMappingUrl Simulation
+        // We can't detect the browser request, but we can detect if someone
+        // tries to APPEND a source mapping URL to the DOM or via other means if we hook it.
+        // For the mock, we'll just have a button or trigger.
+        function checkSourceMap() {
+            // This is just a placeholder for the concept
+            report('SourceMapCheck', false);
+        }
+
+        // 6. Debugger Trap (Safe version)
+        function checkDebugger() {
+            const start = performance.now();
+            (function() {
+                const f = new Function('debugger');
+                // f(); // Would hang test
+            })();
+            const end = performance.now();
+            // If performance.now was used to wrap a debugger call,
+            // the delta would be huge if caught.
+            // Here we just check if we can DETECT the debugger statement in a function's source.
+            const fn = new Function('debugger');
+            // We check for the LITERAL 'debugger' keyword.
+            // If it's replaced by the disarmer, it won't be there.
+            report('DebuggerCheck', /\bdebugger\b/.test(fn.toString()));
+        }
+
+        window.runAllChecks = () => {
+            detections.clear();
+            statusEl.textContent = 'Scanning...';
+            statusEl.style.color = 'black';
+            checkTiming();
+            checkRegExpTrap();
+            checkIntegrity();
+            checkStack();
+            checkDebugger();
+        };
+
+        setTimeout(window.runAllChecks, 500);
+    </script>
+</body>
+</html>
