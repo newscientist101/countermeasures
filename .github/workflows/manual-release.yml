@@ -24,7 +24,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CONCLUSION=$(gh run list --workflow "CI Tests" --branch main --limit 1 --status completed --json conclusion --jq '.[0].conclusion')
+          CONCLUSION=$(gh run list --workflow "CI and Publish" --branch main --limit 1 --status completed --json conclusion --jq '.[0].conclusion')
           echo "Latest completed CI conclusion on main: $CONCLUSION"
           if [ "$CONCLUSION" != "success" ]; then
             echo "Error: The most recent completed CI run on main branch was not successful (Conclusion: $CONCLUSION)."
