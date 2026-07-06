@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>detect-devtools Mock</title>
+</head>
+<body>
+    <div id="status">Scanning...</div>
+    <ul id="results"></ul>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const resultsEl = document.getElementById('results');
+
+        function report(name, detected) {
+            const li = document.createElement('li');
+            li.id = name;
+            li.textContent = `${name}: ${detected ? 'DETECTED' : 'NOT DETECTED'}`;
+            li.style.color = detected ? 'red' : 'green';
+            resultsEl.appendChild(li);
+
+            if (detected) {
+                statusEl.textContent = 'DevTools detected!';
+                statusEl.style.color = 'red';
+            }
+        }
+
+        // 1. ObjectIDCheck
+        function runObjectIDCheck() {
+            let detected = false;
+            const img = new Image();
+            Object.defineProperty(img, 'id', {
+                get: () => {
+                    detected = true;
+                    return 'detect-trap';
+                },
+                configurable: true
+            });
+            // Trigger
+            console.dir(img);
+            setTimeout(() => report('ObjectIDCheck', detected), 100);
+        }
+
+        // 2. LogPerformanceCheck
+        function runLogPerformanceCheck() {
+            const start = performance.now();
+            for (let i = 0; i < 100; i++) {
+                console.log(i);
+            }
+            const end = performance.now();
+            // In a real scenario, we'd compare this to a threshold.
+            // For the mock, we'll assume any significant time means something is watching.
+            // But to keep it simple for the "Red" phase, we'll just check if console.log is NOT a no-op
+            // and if timing works.
+            report('LogPerformanceCheck', (end - start) > 0);
+        }
+
+        // 3. ToStringCheck
+        function runToStringCheck() {
+            let detected = false;
+            const func = function detector() {};
+            func.toString = () => {
+                detected = true;
+                return 'function detector() { [native code] }';
+            };
+            // Trigger by something that might stringify it
+            console.log(func);
+            setTimeout(() => report('ToStringCheck', detected), 100);
+        }
+
+        // 4. DebugCheck
+        function runDebugCheck() {
+            const start = performance.now();
+            // debugger; // We can't really use debugger in automated tests without it hanging
+            // But we can simulate the timing check it usually accompanies
+            const end = performance.now();
+            // If delta is huge, detected. For mock, we'll just check if performance.now() is working.
+            // When patched, (end - start) will be 0.
+            report('DebugCheck', (end - start) > 0);
+        }
+
+        // Run all checks
+        setTimeout(() => {
+            runObjectIDCheck();
+            runLogPerformanceCheck();
+            runToStringCheck();
+            runDebugCheck();
+        }, 500);
+
+    </script>
+</body>
+</html>
