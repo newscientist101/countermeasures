@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>detect-devtools Real Library Test</title>
+</head>
+<body>
+    <h1>detect-devtools Real Library</h1>
+    <div id="status">NOT DETECTED</div>
+    <div id="detection-count">0</div>
+    <ul id="results"></ul>
+
+    <script type="module">
+        import { init } from './vendor/detect-devtools.js';
+
+        const statusEl = document.getElementById('status');
+        const countEl = document.getElementById('detection-count');
+        const resultsEl = document.getElementById('results');
+        let count = 0;
+
+        init((isOpen, type, detail) => {
+            if (isOpen) {
+                count++;
+                statusEl.innerText = 'DETECTED';
+                countEl.innerText = count;
+
+                const li = document.createElement('li');
+                li.innerText = `Type: ${type}, Detail: ${JSON.stringify(detail)}`;
+                resultsEl.appendChild(li);
+                console.log('Devtools detected!', type, detail);
+            }
+        });
+    </script>
+</body>
+</html>

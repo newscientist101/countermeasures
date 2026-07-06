@@ -1,18 +1,19 @@
 (function() {
-    /**
-     * Countermeasure for disable-devtool library.
-     */
+    // @include "../utils/stealth.js"
+
+    const noop = () => {};
+
+    // 1. Core Protections
+    if (window.__stealth_silence_console) window.__stealth_silence_console();
+    if (window.__stealth_suppress_timing) window.__stealth_suppress_timing();
 
     const originalDefineProperty = Object.defineProperty;
     const originalDefineProperties = Object.defineProperties;
-    const originalToString = Function.prototype.toString;
-    const originalNow = Date.now;
-    const originalPerfNow = performance.now;
 
-    // 1. Block property traps used to detect DevTools console inspection
+    // 2. Block property traps used to detect DevTools console inspection
     const blockedProps = ['id', 'className', 'nodeName', 'outerWidth', 'outerHeight', 'innerWidth', 'innerHeight'];
 
-    Object.defineProperty = function(obj, prop, descriptor) {
+    Object.defineProperty = window.__stealth_protect(function(obj, prop, descriptor) {
         if (descriptor && descriptor.get && blockedProps.includes(prop)) {
             return obj;
         }
@@ -21,9 +22,9 @@
         } catch (e) {
             return obj;
         }
-    };
+    }, 'defineProperty');
 
-    Object.defineProperties = function(obj, props) {
+    Object.defineProperties = window.__stealth_protect(function(obj, props) {
         const clonedProps = {};
         for (const prop in props) {
             if (props[prop] && props[prop].get && blockedProps.includes(prop)) {
@@ -36,63 +37,45 @@
         } catch (e) {
             return obj;
         }
-    };
+    }, 'defineProperties');
 
-    // 2. Normalize viewport properties
-    const normalizeViewport = (prop) => {
-        try {
-            originalDefineProperty(window, prop, {
-                get: function() {
-                    if (prop === 'outerWidth') return window.innerWidth;
-                    if (prop === 'outerHeight') return window.innerHeight;
-                    return window[prop];
-                },
-                configurable: true,
-                enumerable: true
-            });
-        } catch (e) {}
-    };
+    // 3. Normalize viewport properties (Lock them)
+    try {
+        const _innerWidth = window.innerWidth;
+        const _innerHeight = window.innerHeight;
+        originalDefineProperty(window, 'outerWidth', { get: () => _innerWidth, configurable: false });
+        originalDefineProperty(window, 'outerHeight', { get: () => _innerHeight, configurable: false });
+    } catch (e) {}
 
-    normalizeViewport('outerWidth');
-    normalizeViewport('outerHeight');
-
-    // 3. Neutralize timing attacks
-    let lastNow = originalNow();
-    Date.now = () => lastNow;
-    if (typeof performance !== 'undefined' && performance.now) {
-        performance.now = () => 0;
-    }
-
-    // 4. Prevent detection of patched native functions
-    Function.prototype.toString = function() {
-        if (this === Object.defineProperty) return 'function defineProperty() { [native code] }';
-        if (this === Object.defineProperties) return 'function defineProperties() { [native code] }';
-        if (this === Function.prototype.toString) return 'function toString() { [native code] }';
-        if (this === Date.now) return 'function now() { [native code] }';
-        if (typeof performance !== 'undefined' && this === performance.now) return 'function now() { [native code] }';
-        return originalToString.apply(this, arguments);
-    };
-
-    // 5. Disable active global instances if present
-    if (window.DisableDevtool) {
-        try {
-            window.DisableDevtool.isSuspend = true;
-            if (typeof window.DisableDevtool.off === 'function') {
-                window.DisableDevtool.off();
-            }
-            for (const key in window.DisableDevtool) {
-                if (typeof window.DisableDevtool[key] === 'function') {
-                    window.DisableDevtool[key] = function() {};
+    // 4. Disable active global instances if present
+    const targetLibrary = () => {
+        if (window.DisableDevtool) {
+            try {
+                window.DisableDevtool.isSuspend = true;
+                if (typeof window.DisableDevtool.off === 'function') {
+                    window.DisableDevtool.off();
                 }
-            }
-        } catch (e) {}
-    }
+                for (const key in window.DisableDevtool) {
+                    if (typeof window.DisableDevtool[key] === 'function') {
+                        window.DisableDevtool[key] = noop;
+                    }
+                }
+            } catch (e) {}
+        }
+    };
+    targetLibrary();
+    setInterval(targetLibrary, 500);
 
-    // 6. Kill intervals (Self-contained)
+    // 5. Kill intervals (Aggressive)
     let maxId = setTimeout(() => {}, 0);
     while (maxId--) {
         clearTimeout(maxId);
         clearInterval(maxId);
+    }
+
+    // 6. Stealth
+    if (window.__stealth_scan_and_hide) {
+        window.__stealth_scan_and_hide();
     }
 
     console.log('disable-devtool has been disarmed.');

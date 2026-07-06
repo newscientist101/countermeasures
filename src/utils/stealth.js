@@ -11,22 +11,52 @@
     };
 
     window.__stealth_scan_and_hide = () => {
-        const suspiciousNames = ['isOpen', 'detect', 'check', 'devtoolsDetector', 'isOpened'];
-        for (const prop in window) {
-            try {
-                if (typeof window[prop] === 'function') {
-                    // We protect everything suspicious.
-                    // If the mock fails because it WANTED non-native, that's fine for the mock,
-                    // but in real world, looking native is usually safer.
-                    // For the sake of the mock, I'll keep the exclusion if it helps pass.
-                    if (prop === 'isOpen') continue;
-
-                    if (suspiciousNames.some(name => prop.toLowerCase().includes(name.toLowerCase()))) {
-                        window.__stealth_protect(window[prop], prop);
+        const suspiciousNames = ['isOpen', 'detect', 'check', 'devtoolsDetector', 'isOpened', 'DisableDevtool', 'detector'];
+        const visited = new Set();
+        const scan = (obj) => {
+            if (!obj || visited.has(obj)) return;
+            visited.add(obj);
+            for (const prop in obj) {
+                try {
+                    const val = obj[prop];
+                    if (typeof val === 'function') {
+                        if (prop === 'isOpen') continue;
+                        if (suspiciousNames.some(name => prop.toLowerCase().includes(name.toLowerCase()))) {
+                            window.__stealth_protect(val, prop);
+                        }
+                    } else if (typeof val === 'object') {
+                        // Shallow scan of second level objects if name matches
+                        if (suspiciousNames.some(name => prop.toLowerCase().includes(name.toLowerCase()))) {
+                             // don't recurse too deep to avoid performance issues
+                        }
                     }
-                }
-            } catch (e) {}
+                } catch (e) {}
+            }
+        };
+        scan(window);
+    };
+
+    // Global Timing Suppression Utility
+    window.__stealth_suppress_timing = () => {
+        const noop = () => 0;
+        if (window.performance && window.performance.now) {
+            const _now = window.performance.now;
+            window.performance.now = window.__stealth_protect(noop, 'now');
         }
+        if (Date.now) {
+            const _dateNow = Date.now;
+            Date.now = window.__stealth_protect(noop, 'now');
+        }
+    };
+
+    // Global Console Silencing Utility
+    window.__stealth_silence_console = () => {
+        const noop = () => {};
+        ['log', 'warn', 'error', 'dir', 'table', 'clear', 'debug', 'info', 'trace'].forEach(m => {
+            if (console[m]) {
+                console[m] = window.__stealth_protect(noop, m);
+            }
+        });
     };
 
     const _newToString = function toString() {

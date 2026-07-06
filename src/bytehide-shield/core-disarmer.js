@@ -2,8 +2,8 @@
     // 1. Mask Geometry
     const _defProp = Object.defineProperty;
     try {
-        _defProp(window, 'outerWidth', { get: () => window.innerWidth, configurable: true });
-        _defProp(window, 'outerHeight', { get: () => window.innerHeight, configurable: true });
+        _defProp(window, 'outerWidth', { get: () => window.innerWidth, configurable: false });
+        _defProp(window, 'outerHeight', { get: () => window.innerHeight, configurable: false });
         _defProp(window, 'devicePixelRatio', { get: () => 1, configurable: true });
     } catch (e) {
         console.warn('ByteHide Shield: Could not patch geometry', e);

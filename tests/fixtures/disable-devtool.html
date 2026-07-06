@@ -6,22 +6,23 @@
 <body>
     <div id="status">INITIAL</div>
     <div id="detection-count">0</div>
-    <script src="https://cdn.jsdelivr.net/npm/disable-devtool"></script>
     <script>
-        let count = 0;
-        if (typeof DisableDevtool !== 'undefined') {
-            DisableDevtool({
-                ondevtool: (val) => {
-                    count++;
-                    document.getElementById('status').innerText = 'DETECTED';
-                    document.getElementById('detection-count').innerText = count;
-                    console.log('Devtools detected!', val);
-                },
-                interval: 500
-            });
-        } else {
-            document.getElementById('status').innerText = 'LIBRARY NOT LOADED';
-        }
+        // Use manual mode for better test control
+        (function() {
+            const script = document.createElement('script');
+            script.src = 'vendor/disable-devtool.min.js';
+            script.onload = () => {
+                DisableDevtool({
+                    ondevtool: (val) => {
+                        document.getElementById('status').innerText = 'DETECTED';
+                        document.body.classList.add('detected');
+                        console.log('Devtools detected!', val);
+                    },
+                    interval: 500
+                });
+            };
+            document.head.appendChild(script);
+        })();
     </script>
 </body>
 </html>

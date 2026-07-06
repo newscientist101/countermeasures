@@ -3,7 +3,11 @@
 
     const noop = () => {};
 
-    // 1. devtoolsFormatters neutralization
+    // 1. Core Protections
+    if (window.__stealth_silence_console) window.__stealth_silence_console();
+    if (window.__stealth_suppress_timing) window.__stealth_suppress_timing();
+
+    // 2. devtoolsFormatters neutralization
     try {
         window.devtoolsFormatters = [];
         Object.defineProperty(window, 'devtoolsFormatters', {
@@ -13,38 +17,41 @@
         });
     } catch (e) {}
 
-    // 2. Block property traps on id
+    // 3. Block property traps on id and other common probes
     const _defProp = Object.defineProperty;
+    const blockedProps = ['id', 'className', 'nodeName', 'outerWidth', 'outerHeight', 'innerWidth', 'innerHeight'];
+
     Object.defineProperty = window.__stealth_protect(function(obj, prop, descriptor) {
-        if (prop === 'id' && descriptor && (descriptor.get || descriptor.set)) {
+        if (blockedProps.includes(prop) && descriptor && (descriptor.get || descriptor.set)) {
             return obj;
         }
         return _defProp.apply(this, arguments);
     }, 'defineProperty');
 
-    // 3. Fake geometry
+    // 4. Fake geometry (Persistent)
     try {
+        const _innerWidth = window.innerWidth;
+        const _innerHeight = window.innerHeight;
         Object.defineProperty(window, 'outerWidth', {
-            get: () => window.innerWidth,
+            get: () => _innerWidth,
+            set: () => {},
             configurable: false
         });
         Object.defineProperty(window, 'outerHeight', {
-            get: () => window.innerHeight,
+            get: () => _innerHeight,
+            set: () => {},
             configurable: false
         });
         Object.defineProperty(window, 'devicePixelRatio', {
             get: () => 1,
+            set: () => {},
             configurable: false
         });
     } catch (e) {}
 
-    // 4. Neutralize destructive actions
+    // 5. Neutralize destructive actions
     try {
         window.close = window.__stealth_protect(noop, 'close');
-
-        // Location reload neutralization
-        // We try to replace the property on the instance.
-        // If it fails, we try to redefine it on the window object.
         const _location = window.location;
         try {
             Object.defineProperty(_location, 'reload', {
@@ -52,47 +59,41 @@
                 configurable: true,
                 writable: true
             });
-        } catch (e) {
-            try {
-                // If we can't change .reload, maybe we can change window.location
-                const proxy = new Proxy(_location, {
-                    get: (target, prop) => {
-                        if (prop === 'reload') return noop;
-                        const val = target[prop];
-                        return typeof val === 'function' ? val.bind(target) : val;
-                    }
-                });
-                Object.defineProperty(window, 'location', {
-                    get: () => proxy,
-                    configurable: true
-                });
-            } catch (e2) {}
-        }
-
-        // Final fallback: intercept events
-        window.addEventListener('beforeunload', (e) => {
-            e.preventDefault();
-            e.returnValue = '';
-            return '';
-        }, { capture: true });
+        } catch (e) {}
     } catch (e) {}
 
-    // 5. Specific library targeting
-    if (window.devtoolsDetector) {
-        try {
-            if (typeof window.devtoolsDetector.stop === 'function') {
-                window.devtoolsDetector.stop();
-            }
-            if (typeof window.devtoolsDetector.setDetectorDelay === 'function') {
-                window.devtoolsDetector.setDetectorDelay(Infinity);
-            }
-        } catch (e) {}
+    // 6. Specific library targeting (Aggressive)
+    const targetLibrary = () => {
+        if (window.devtoolsDetector) {
+            try {
+                if (typeof window.devtoolsDetector.stop === 'function') {
+                    window.devtoolsDetector.stop();
+                }
+                if (typeof window.devtoolsDetector.setDetectDelay === 'function') {
+                    window.devtoolsDetector.setDetectDelay(-1);
+                }
+                if (window.devtoolsDetector._listeners) {
+                    window.devtoolsDetector._listeners = [];
+                }
+            } catch (e) {}
+        }
+    };
+    targetLibrary();
+    setInterval(targetLibrary, 500);
+
+    // 7. Kill all existing intervals/timeouts to stop detection loops
+    let maxId = setTimeout(() => {}, 0);
+    while (maxId--) {
+        if (maxId > 100) { // Don't kill very low IDs which might be browser/test internals
+            clearTimeout(maxId);
+            clearInterval(maxId);
+        }
     }
 
-    // 6. Stealth existing functions
+    // 8. Stealth everything
     if (window.__stealth_scan_and_hide) {
         window.__stealth_scan_and_hide();
     }
 
-    console.warn('devtools-detector disarmed.');
+    console.warn('devtools-detector disarmed (v2).');
 })();

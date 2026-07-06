@@ -4,59 +4,49 @@ import fs from 'fs';
 
 test.describe('Jscrambler Universal Bypass', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto(`file://${path.join(process.cwd(), 'tests/fixtures/jscrambler-mock.html')}`);
+        await page.goto(`file://${path.join(process.cwd(), 'tests/fixtures/jscrambler-complex-mock.html')}`);
     });
 
     test('Red Phase: Mock should detect "debugging" without bypass', async ({ page }) => {
         // Wait for checks to run automatically
         await page.waitForTimeout(1000);
 
-        const timingCheck = page.locator('#TimingCheck');
-        const consoleTrapCheck = page.locator('#ConsoleTrapCheck');
-        const integrityCheck = page.locator('#IntegrityCheck');
-        const debuggerCheck = page.locator('#DebuggerCheck');
-        const stackCheck = page.locator('#StackCheck');
-
-        // Without any bypass, these should be "DETECTED" or at least normal behavior
-        await expect(timingCheck).toContainText('DETECTED');
-        await expect(consoleTrapCheck).toContainText('DETECTED');
-        // Integrity should be NOT DETECTED because it's currently native
-        await expect(integrityCheck).toContainText('NOT DETECTED');
-        await expect(debuggerCheck).toContainText('DETECTED');
-        await expect(stackCheck).toContainText('DETECTED');
+        await expect(page.locator('#res-TimingCheck')).toContainText('DETECTED');
+        await expect(page.locator('#res-RegExpTrap')).toContainText('NOT DETECTED'); // Regex trap is NOT detected by default (browser is native)
+        await expect(page.locator('#res-IntegrityCheck')).toContainText('NOT DETECTED'); // Integrity is NOT detected by default
+        await expect(page.locator('#res-DebuggerCheck')).toContainText('DETECTED'); // Mock reports DETECTED if 'debugger' is in source
+        await expect(page.locator('#res-StackCheck')).toContainText('DETECTED'); // Stack exists by default
     });
 
     test('Green Phase: Disarmer and Timing Suppressor should neutralize detections', async ({ page }) => {
-        // 1. Load and inject the disarmer and suppressor
         const disarmerSource = fs.readFileSync(path.join(process.cwd(), 'src/jscrambler/disarmer.js'), 'utf8');
         const suppressorSource = fs.readFileSync(path.join(process.cwd(), 'src/jscrambler/timing-suppressor.js'), 'utf8');
 
         await page.evaluate(disarmerSource);
         await page.evaluate(suppressorSource);
 
-        // 2. Re-run all checks
+        // Re-run all checks
         await page.evaluate(() => {
             window.runAllChecks();
         });
 
-        // 3. Wait for checks to complete
+        // Wait for checks to complete
         await page.waitForTimeout(1000);
 
-        const timingCheck = page.locator('#TimingCheck');
-        const consoleTrapCheck = page.locator('#ConsoleTrapCheck');
-        const integrityCheck = page.locator('#IntegrityCheck');
-        const debuggerCheck = page.locator('#DebuggerCheck');
-        const stackCheck = page.locator('#StackCheck');
-
-        // With bypass, timing should be 0 (NOT DETECTED)
-        await expect(timingCheck).toContainText('NOT DETECTED');
-        // Console traps should be blocked (NOT DETECTED)
-        await expect(consoleTrapCheck).toContainText('NOT DETECTED');
+        // Timing should be 0 (NOT DETECTED)
+        await expect(page.locator('#res-TimingCheck')).toContainText('NOT DETECTED');
+        // RegExp trap should be neutralized (spoofed native)
+        await expect(page.locator('#res-RegExpTrap')).toContainText('NOT DETECTED');
         // Integrity should still be NOT DETECTED (spoofed native)
-        await expect(integrityCheck).toContainText('NOT DETECTED');
-        // Debugger should be stripped (NOT DETECTED)
-        await expect(debuggerCheck).toContainText('NOT DETECTED');
-        // Stack should be blocked or modified (NOT DETECTED)
-        await expect(stackCheck).toContainText('NOT DETECTED');
+        await expect(page.locator('#res-IntegrityCheck')).toContainText('NOT DETECTED');
+
+        // Debugger check: The disarmer replaces 'debugger' with a comment.
+        // The mock checks if the stringified function body contains 'debugger'.
+        // Wait, the disarmer hooks Function and Function.prototype.constructor.
+        // It should work for new Function('debugger').
+        await expect(page.locator('#res-DebuggerCheck')).toContainText('NOT DETECTED');
+
+        // Stack should be suppressed (NOT DETECTED)
+        await expect(page.locator('#res-StackCheck')).toContainText('NOT DETECTED');
     });
 });

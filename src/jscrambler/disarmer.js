@@ -47,10 +47,14 @@
         if (args.length > 0) {
             let body = args[args.length - 1];
             if (typeof body === 'string' && body.includes('debugger')) {
-                args[args.length - 1] = body.replace(/debugger/g, '/* debugger blocked */');
+                body = body.replace(/\bdebugger\b/g, '/* dbg blocked */');
+                args[args.length - 1] = body;
             }
         }
-        // Use 'new' to correctly handle Function constructor
+        // Correctly handle being called with or without 'new'
+        if (!(this instanceof patchedFunction)) {
+            return _Function.apply(null, args);
+        }
         return new _Function(...args);
     };
     hook(window, 'Function', patchedFunction);
